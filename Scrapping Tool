@@ -33,7 +33,7 @@ def scrape_and_send_to_serenity(model_name, urls):
     url = "https://api.serenitystar.ai/api/v2/agent/dataMapper/execute"
     headers = {
         "Content-Type": "application/json",
-        "X-API-KEY": "AD48B42F-6931-4E67-8D05-F294A0A88447"
+        "X-API-KEY": "Introducir la API de Serenity o pedirmela a mi"
     }
     payload = [{"key": "model_name", "value": model_name}, {"key": "urls", "value": ",".join(urls)}]
 
