@@ -1,0 +1,31 @@
+# Validación de resultados
+Si comparamos los datos obtenidos a través de los códigos anteriores con los datos reales, el resultado es el siguiente:
+El Scrapping Tool no ha sido capaz de dar la fecha de lanzamiento correctamente por lo general, las fechas muchas veces son correctas pero en otras no.
+Hay variables como Parámetros y Tokens Entrenados donde la información no es completa y tampoco correcta, porque la falta de URLs dificulta la busqueda.
+Algunas variables numéricas como Temperatura, Top P y Top K no se obtienen adecuadamente e incluso en la mayoria de modelos la información es nula.
+Las variables que son de texto, pese a que son breves son útiles ya que las definen bien en su mayoria.
+Existen variables que no han obtenido información. Estas son:
+Maximo_Total_de_Tokens, que indica que son 0 en todos.
+Niveles_de_Seguridad_y_Filtrado Compatibilidad_de_Implementación.
+Consideraciones_Éticas_y_Sesgos Alineamiento_con_Normativas.
+Capacidades y arquitectura, pese a que al recopilar información se obtienen por separado pero al juntarlos se borra.
+El Scraping Tool resulta útil para recopilar variables de texto, si son variables numéricas el resultado falla o incluso puede no dar información.
+La falta de URLs con tablas ordenadas de las variables dificulta la busqueda de información.
+
+# Los datos que se han recopilado son de los siguientes modelos y estos son sus enlaces:
+
+Gemini 1.5 Pro: https://huggingface.co/mooo16/gemini-1.5-pro-gemma-rewrite-1024, https://deepmind.google/technologies/gemini/pro, https://storage.googleapis.com/deepmind-media/gemini/gemini_v1_5_report.pdf
+
+Llama 3.2 3B : https://huggingface.co/meta-llama/Llama-3.2-3B, https://huggingface.co/alpindale/Llama-3.2-3B-Instruct'
+
+Mistral Large 2 : https://huggingface.co/bartowski/Tess-3-Mistral-Large-2-123B-GGUF , https://docs.mistral.ai/getting-started/models/models_overview/
+
+Llama 3.1 8B: https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct
+
+Llama 3.1 70B: https://huggingface.co/meta-llama/Llama-3.1-70B, https://cloud.google.com/vertex-ai/generative-ai/docs/model-garden/explore-models?hl=es-419
+
+Wizard LM2 (8X22B): https://huggingface.co/alpindale/WizardLM-2-8x22B
+
+ChatGPT 4o mini: https://openai.com/index0/gpt-4o-mini-advancing-cost-efficient-intelligence/, https://amara-marketing.com/blog-pymes/gpt-4o-mini/
+
+Claude 3.5 Sonnet: https://docs.anthropic.com/en/docs/about-claude/models, https://www.anthropic.com/news/claude-3-5-sonnet
