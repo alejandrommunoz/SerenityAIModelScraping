@@ -1,0 +1,347 @@
+import requests
+import pandas as pd
+import json
+import sqlite3
+import logging
+from sqlalchemy import create_engine, text
+import os
+
+log_directory = '/content/logs/'
+try:
+    os.makedirs(log_directory, exist_ok=True)
+except OSError as e:
+    print(f"Error al crear el directorio {log_directory}: {e}")
+
+# Elimina handlers previos para evitar conflictos
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+
+# Configuración de logging
+log_file = os.path.join(log_directory, 'scrape_and_store.log')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),  # Escribir en archivo
+        logging.StreamHandler()         # Escribir en consola
+    ]
+)
+
+
+
+def scrape_and_send_to_serenity(model_name, urls):
+    url = "https://api.serenitystar.ai/api/v2/agent/dataMapper/execute"
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-KEY": "AD48B42F-6931-4E67-8D05-F294A0A88447"
+    }
+    payload = [{"key": "model_name", "value": model_name}, {"key": "urls", "value": ",".join(urls)}]
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        logging.info("Código de respuesta: %s", response.status_code)
+        logging.info("Respuesta del servidor (texto): %s", response.text)
+        print("Código de respuesta:", response.status_code)
+        print("Respuesta del servidor (texto):", response.text)
+
+        # Verificar que la respuesta no esté vacía
+        if not response.text.strip():
+            logging.warning("La respuesta está vacía o no contiene datos válidos.")
+            print("La respuesta está vacía o no contiene datos válidos.")
+            return None
+
+        if response.status_code == 200 and response.text:
+            try:
+                # Intentamos parsear el JSON
+                data = response.json()
+
+                # Verificar que el campo 'content' está presente y no está vacío
+                if 'content' in data and data['content'].strip():
+                    # El contenido está en formato de bloque de código JSON, eliminamos los backticks
+                    raw_json = data['content']
+                    clean_json = raw_json.strip('```json\n').strip('```')
+
+                    # Intentamos parsear el JSON limpio
+                    try:
+                        json_data = json.loads(clean_json)
+                        logging.info("Tipo de json_data:", type(json_data))
+                        logging.info("Contenido de json_data:", json_data)
+                        print("Tipo de json_data:", type(json_data))  # Verificar tipo
+                        print("Contenido de json_data:", json_data)  # Verificar contenido
+
+                        # Verificamos que json_data sea un diccionario antes de usar .get()
+                        if isinstance(json_data, dict):
+                            logging.info("Datos recibidos de Serenity: %s", json.dumps(json_data, indent=2))
+                            print("Datos recibidos de Serenity:", json.dumps(json_data, indent=2))
+
+                            # Procesamos los datos como un diccionario
+                            row = {
+                                "Modelo": json_data.get("Modelo", ""),
+                                "Desarrollador": json_data.get("Desarrollador", ""),
+                                "Fecha_de_Lanzamiento": json_data.get("Fecha de Lanzamiento", ""),
+                                "Overview": json_data.get("Overview", ""),
+                                "Capacidades": json_data.get("Capacidades", ""),
+                                "Arquitectura": json_data.get("Arquitectura", ""),
+                                "Parámetros": json_data.get("Parámetros", ""),
+                                "Tokens_Entrenados": json_data.get("Tokens Entrenados", ""),
+                                "Optimización": json_data.get("Optimización", ""),
+                                "Dataset": json_data.get("Dataset", ""),
+                                "Max_Tokens": json_data.get("Máximo Total de Tokens", ""),
+                                "Max_Output_Tokens": json_data.get("Máximo de Tokens de Salida", ""),
+                                "Temperature": json_data.get("Temperatura", ""),
+                                "Top_P": json_data.get("Top P", ""),
+                                "Top_K": json_data.get("Top K", ""),
+                                "Costos_de_Uso": json_data.get("Costos de Uso", ""),
+                                "Fine_Tuning": json_data.get("Fine Tuning", ""),
+                                "Soporte_Multilingüe": json_data.get("Soporte Multilingüe", ""),
+                                "Idiomas_Eficaces": json_data.get("Idiomas con Alta Eficacia", ""),
+                                "Model_Card_Link": json_data.get("Model Card Link", ""),
+                                "Announcement_Link": json_data.get("Announcement Link", ""),
+                                "Casos_de_Uso": json_data.get("Casos de Uso", ""),
+                                "Case_Source": json_data.get("Case Source", ""),
+                                "Access": json_data.get("Access", ""),
+                                "License": json_data.get("License", ""),
+                                "Requisitos_Computacionales": json_data.get("Requisitos Computacionales", ""),
+                                "Latencia_Promedio": json_data.get("Latencia Promedio", ""),
+                                "Niveles_de_Seguridad": json_data.get("Niveles de Seguridad y Filtrado", ""),
+                                "Compatibilidad_Implementacion": json_data.get("Compatibilidad de Implementación", ""),
+                                "Consideraciones_Éticas": json_data.get("Consideraciones Éticas y Sesgos", ""),
+                                "Alineamiento_Normativo": json_data.get("Alineamiento con Normativas", "")
+                            }
+                            logging.info("Fila procesada: %s", row)
+                            print("Fila procesada:", row)
+                            return row
+                        else:
+                            logging.warning("El contenido no es un diccionario válido. Tipo recibido: %s", type(json_data))
+                            print("El contenido no es un diccionario válido. Tipo recibido:", type(json_data))
+                            return None
+                    except json.JSONDecodeError as e:
+                        logging.warning("El campo 'content' está vacío o no contiene datos válidos.")
+                        print(f"Error al parsear JSON desde 'content': {e}")
+                        return None
+                else:
+                    print("El campo 'content' está vacío o no contiene datos válidos.")
+                    return None
+            except json.JSONDecodeError as e:
+                logging.error("Error al parsear la respuesta JSON general: %s", e)
+                print(f"Error al parsear la respuesta JSON general: {e}")
+                return None
+        else:
+            logging.warning("El servidor no devolvió una respuesta válida.")
+            print("El servidor no devolvió una respuesta válida.")
+            return None
+    except requests.exceptions.RequestException as e:
+        logging.error("Error durante la solicitud: %s", e)
+        print(f"Error durante la solicitud: {e}")
+        return None
+
+
+
+# Crear la base de datos SQLite
+def create_database(db_name="serenity_data.db"):
+    conn = sqlite3.connect(db_name)
+    logging.info("Conexión a la base de datos %s establecida.", db_name)
+    print(f"Conexión a la base de datos {db_name} establecida.")
+    return conn
+
+# Crear la tabla en la base de datos
+def create_table(conn):
+    query = """
+    CREATE TABLE IF NOT EXISTS serenity_info (
+        Modelo TEXT,
+        Desarrollador TEXT,
+        Fecha_de_Lanzamiento TEXT,
+        Overview TEXT,
+        Capacidades_y_Arquitectura TEXT,
+        Parámetros INTEGER,
+        Tokens_Entrenados INTEGER,
+        Optimización TEXT,
+        Dataset TEXT,
+        Máximo_Total_de_Tokens INTEGER,
+        Máximo_de_Tokens_de_Salida INTEGER,
+        Temperatura REAL,
+        Top_P REAL,
+        Top_K INTEGER,
+        Costos_de_Uso TEXT,
+        Fine_Tuning TEXT,
+        Soporte_Multilingüe TEXT,
+        Idiomas_con_Alta_Eficacia TEXT,
+        Idiomas_con_Buen_Rendimiento TEXT,
+        Model_Card_Link TEXT,
+        Announcement_Link TEXT,
+        Casos_de_Uso TEXT,
+        Case_Source TEXT,
+        Access TEXT,
+        License TEXT,
+        Requisitos_Computacionales TEXT,
+        Latencia_Promedio REAL,
+        Niveles_de_Seguridad_y_Filtrado TEXT,
+        Compatibilidad_de_Implementación TEXT,
+        Consideraciones_Éticas_y_Sesgos TEXT,
+        Alineamiento_con_Normativas TEXT
+    );
+    """
+    conn.execute(query)
+    conn.commit()
+    logging.info("Tabla 'serenity_info' creada o ya existente.")
+    print("Tabla 'serenity_info' creada o ya existente.")
+
+# Insertar los datos en la tabla
+def insert_or_update_data(conn, data):
+    # Asegurarse de que 'Costos_de_Uso' sea un string
+    if not isinstance(data["Costos_de_Uso"], str):
+        try:
+            data["Costos_de_Uso"] = json.dumps(data["Costos_de_Uso"])
+        except TypeError:
+            data["Costos_de_Uso"] = ""  # Valor por defecto si no se puede convertir
+    if isinstance(data['Casos_de_Uso'], (list, dict)):
+        data['Casos_de_Uso'] = json.dumps(data['Casos_de_Uso'])
+
+    # Comprobar si ya existe un registro con el mismo modelo
+    query_check = "SELECT COUNT(*) FROM serenity_info WHERE Modelo = :Modelo"
+    result = conn.execute(query_check, {"Modelo": data["Modelo"]}).fetchone()
+
+    if result[0] > 0:
+        # Actualizar registro existente
+        query_update = """
+        UPDATE serenity_info SET
+            Desarrollador = :Desarrollador,
+            Fecha_de_Lanzamiento = :Fecha_de_Lanzamiento,
+            Overview = :Overview,
+            Capacidades_y_Arquitectura = :Capacidades_y_Arquitectura,
+            Parámetros = :Parámetros,
+            Tokens_Entrenados = :Tokens_Entrenados,
+            Optimización = :Optimización,
+            Dataset = :Dataset,
+            Máximo_Total_de_Tokens = :Máximo_Total_de_Tokens,
+            Máximo_de_Tokens_de_Salida = :Máximo_de_Tokens_de_Salida,
+            Temperatura = :Temperatura,
+            Top_P = :Top_P,
+            Top_K = :Top_K,
+            Costos_de_Uso = :Costos_de_Uso,
+            Fine_Tuning = :Fine_Tuning,
+            Soporte_Multilingüe = :Soporte_Multilingüe,
+            Idiomas_con_Alta_Eficacia = :Idiomas_con_Alta_Eficacia,
+            Idiomas_con_Buen_Rendimiento = :Idiomas_con_Buen_Rendimiento,
+            Model_Card_Link = :Model_Card_Link,
+            Announcement_Link = :Announcement_Link,
+            Casos_de_Uso = :Casos_de_Uso,
+            Case_Source = :Case_Source,
+            Access = :Access,
+            License = :License,
+            Requisitos_Computacionales = :Requisitos_Computacionales,
+            Latencia_Promedio = :Latencia_Promedio,
+            Niveles_de_Seguridad_y_Filtrado = :Niveles_de_Seguridad_y_Filtrado,
+            Compatibilidad_de_Implementación = :Compatibilidad_de_Implementación,
+            Consideraciones_Éticas_y_Sesgos = :Consideraciones_Éticas_y_Sesgos,
+            Alineamiento_con_Normativas = :Alineamiento_con_Normativas
+        WHERE Modelo = :Modelo
+        """
+        conn.execute(query_update, data)
+        conn.commit()
+        logging.info("Registro actualizado para el modelo: %s", data["Modelo"])
+    else:
+        # Insertar nuevo registro
+        query_insert = """
+        INSERT INTO serenity_info (
+            Modelo, Desarrollador, Fecha_de_Lanzamiento, Overview,
+            Capacidades_y_Arquitectura, Parámetros, Tokens_Entrenados,
+            Optimización, Dataset, Máximo_Total_de_Tokens,
+            Máximo_de_Tokens_de_Salida, Temperatura, Top_P, Top_K,
+            Costos_de_Uso, Fine_Tuning, Soporte_Multilingüe,
+            Idiomas_con_Alta_Eficacia, Idiomas_con_Buen_Rendimiento,
+            Model_Card_Link, Announcement_Link, Casos_de_Uso,
+            Case_Source, Access, License, Requisitos_Computacionales,
+            Latencia_Promedio, Niveles_de_Seguridad_y_Filtrado,
+            Compatibilidad_de_Implementación, Consideraciones_Éticas_y_Sesgos,
+            Alineamiento_con_Normativas
+        ) VALUES (
+            :Modelo, :Desarrollador, :Fecha_de_Lanzamiento, :Overview,
+            :Capacidades_y_Arquitectura, :Parámetros, :Tokens_Entrenados,
+            :Optimización, :Dataset, :Máximo_Total_de_Tokens,
+            :Máximo_de_Tokens_de_Salida, :Temperatura, :Top_P, :Top_K,
+            :Costos_de_Uso, :Fine_Tuning, :Soporte_Multilingüe,
+            :Idiomas_con_Alta_Eficacia, :Idiomas_con_Buen_Rendimiento,
+            :Model_Card_Link, :Announcement_Link, :Casos_de_Uso,
+            :Case_Source, :Access, :License, :Requisitos_Computacionales,
+            :Latencia_Promedio, :Niveles_de_Seguridad_y_Filtrado,
+            :Compatibilidad_de_Implementación, :Consideraciones_Éticas_y_Sesgos,
+            :Alineamiento_con_Normativas
+        );
+        """
+        conn.execute(query_insert, data)
+        conn.commit()
+        logging.info("Nuevo registro insertado para el modelo: %s", data["Modelo"])
+        print(f"Datos del modelo {data['Modelo']} insertados correctamente.")
+
+
+
+# Función principal
+def main():
+    model_name = input("Ingrese el nombre del modelo: ")
+    urls = input("Ingrese una o más URLs separadas por comas: ").split(",")
+
+    # Obtener datos de Serenity
+    data = scrape_and_send_to_serenity(model_name, urls)
+
+    if data:
+        # Crear conexión a la base de datos y tabla
+        conn = create_database()
+        create_table(conn)
+
+        # Verificamos si los datos recibidos son un diccionario
+        if isinstance(data, dict):
+            # Procesar los datos como un diccionario directamente
+            row = {
+                "Modelo": data.get("Modelo", ""),
+                "Desarrollador": data.get("Desarrollador", ""),
+                "Fecha_de_Lanzamiento": data.get("Fecha_de_Lanzamiento", ""),
+                "Overview": data.get("Overview", ""),
+                "Capacidades_y_Arquitectura": data.get("Capacidades_y_Arquitectura", ""),
+                "Parámetros": data.get("Parámetros", 0),
+                "Tokens_Entrenados": data.get("Tokens_Entrenados", 0),
+                "Optimización": data.get("Optimización", ""),
+                "Dataset": data.get("Dataset", ""),
+                "Máximo_Total_de_Tokens": data.get("Máximo_Total_de_Tokens", 0),
+                "Máximo_de_Tokens_de_Salida": data.get("Máximo_de_Tokens_de_Salida", 0),
+                "Temperatura": data.get("Temperatura", 0.0),
+                "Top_P": data.get("Top_P", 0.0),
+                "Top_K": data.get("Top_K", 0),
+                "Costos_de_Uso": data.get("Costos_de_Uso", ""),
+                "Fine_Tuning": data.get("Fine_Tuning", ""),
+                "Soporte_Multilingüe": data.get("Soporte_Multilingüe", ""),
+                "Idiomas_con_Alta_Eficacia": data.get("Idiomas_con_Alta_Eficacia", ""),
+                "Idiomas_con_Buen_Rendimiento": data.get("Idiomas_con_Buen_Rendimiento", ""),
+                "Model_Card_Link": data.get("Model_Card_Link", ""),
+                "Announcement_Link": data.get("Announcement_Link", ""),
+                "Casos_de_Uso": data.get("Casos_de_Uso", ""),
+                "Case_Source": data.get("Case_Source", ""),
+                "Access": data.get("Access", ""),
+                "License": data.get("License", ""),
+                "Requisitos_Computacionales": data.get("Requisitos_Computacionales", ""),
+                "Latencia_Promedio": data.get("Latencia_Promedio", 0.0),
+                "Niveles_de_Seguridad_y_Filtrado": data.get("Niveles_de_Seguridad_y_Filtrado", ""),
+                "Compatibilidad_de_Implementación": data.get("Compatibilidad_de_Implementación", ""),
+                "Consideraciones_Éticas_y_Sesgos": data.get("Consideraciones_Éticas_y_Sesgos", ""),
+                "Alineamiento_con_Normativas": data.get("Alineamiento_con_Normativas", "")
+            }
+
+            # Insertar los datos en la base de datos using the correct function name
+            insert_or_update_data(conn, row)
+
+        # Mostrar los datos almacenados
+        df = pd.read_sql("SELECT * FROM serenity_info", conn)
+        print(df)
+
+        conn.close()
+        print("Conexión cerrada.")
+    else:
+          logging.error("No se pudo obtener o procesar datos.")
+
+logging.info("Escribiendo un mensaje final en el log.")
+logging.shutdown()
+
+if __name__ == "__main__":
+    main()
+
